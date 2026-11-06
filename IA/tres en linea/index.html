@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tres en Línea con IA - POO & Tailwind</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              playerX: '#38bdf8', // Sky 400
+              playerO: '#f43f5e', // Rose 500
+              accent: '#818cf8',  // Indigo 400
+              surface: '#0f172a', // Slate 900
+              card: '#1e293b'     // Slate 800
+            }
+          },
+          animation: {
+            'pop-in': 'popIn 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards',
+            'pulse-glow': 'pulseGlow 2s infinite'
+          },
+          keyframes: {
+            popIn: {
+              '0%': { transform: 'scale(0.3)', opacity: '0' },
+              '100%': { transform: 'scale(1)', opacity: '1' }
+            },
+            pulseGlow: {
+              '0%, 100%': { opacity: '0.6', transform: 'scale(1)' },
+              '50%': { opacity: '1', transform: 'scale(1.03)' }
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Estilos adicionales para soporte de animación y canvas */
+    #confettiCanvas {
+      pointer-events: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 50;
+    }
+    .cell-glow-x {
+      box-shadow: 0 0 25px rgba(56, 189, 248, 0.45);
+    }
+    .cell-glow-o {
+      box-shadow: 0 0 25px rgba(244, 63, 94, 0.45);
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col items-center justify-between font-sans selection:bg-indigo-500 selection:text-white p-4">
+
+  <!-- Canvas de Confetti para victorias -->
+  <canvas id="confettiCanvas"></canvas>
+
+  <!-- Contenedor Principal -->
+  <main class="w-full max-w-xl mx-auto flex flex-col items-center gap-6 py-6">
+
+    <!-- Encabezado -->
+    <header class="text-center space-y-2">
+      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-semibold uppercase tracking-wider">
+        <span>🤖 Inteligencia Artificial</span>
+        <span class="text-indigo-400">•</span>
+        <span>Minimax & POO</span>
+      </div>
+      <h1 class="text-4xl sm:text-5xl font-black tracking-tight bg-gradient-to-r from-sky-400 via-indigo-300 to-rose-400 bg-clip-text text-transparent">
+        Tres en Línea
+      </h1>
+      <p class="text-sm text-slate-400">
+        Desarrollado con Arquitectura Orientada a Objetos y Tailwind CSS
+      </p>
+    </header>
+
+    <!-- Barra de Configuración y Modos -->
+    <section class="w-full bg-slate-900/80 backdrop-blur border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl space-y-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <!-- Modo de Juego -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wide">
+            Modo de Juego
+          </label>
+          <div class="grid grid-cols-2 gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800">
+            <button id="modeAiBtn" class="py-2 px-3 rounded-lg text-xs font-medium transition-all duration-200 bg-indigo-600 text-white shadow-sm flex items-center justify-center gap-1.5">
+              <span>🤖</span> Vs IA
+            </button>
+            <button id="modePvpBtn" class="py-2 px-3 rounded-lg text-xs font-medium transition-all duration-200 text-slate-400 hover:text-white flex items-center justify-center gap-1.5">
+              <span>👥</span> 1 vs 1
+            </button>
+          </div>
+        </div>
+
+        <!-- Dificultad de la IA -->
+        <div id="difficultyContainer">
+          <label class="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wide">
+            Dificultad IA
+          </label>
+          <div class="grid grid-cols-3 gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+            <button data-difficulty="easy" class="diff-btn py-2 px-2 rounded-lg text-xs font-medium transition-all text-slate-400 hover:text-white">
+              Fácil
+            </button>
+            <button data-difficulty="medium" class="diff-btn py-2 px-2 rounded-lg text-xs font-medium transition-all text-slate-400 hover:text-white">
+              Media
+            </button>
+            <button data-difficulty="hard" class="diff-btn py-2 px-2 rounded-lg text-xs font-medium transition-all bg-indigo-600 text-white shadow-sm">
+              Imbatible
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ajustes secundarios: Símbolo del jugador y Sonido -->
+      <div class="flex items-center justify-between pt-2 border-t border-slate-800 text-xs text-slate-400">
+        <div class="flex items-center gap-2">
+          <span>Tu ficha:</span>
+          <div class="inline-flex bg-slate-950 rounded-lg p-0.5 border border-slate-800">
+            <button id="chooseXBtn" class="px-2.5 py-1 rounded-md text-xs font-bold text-sky-400 bg-slate-800">X</button>
+            <button id="chooseOBtn" class="px-2.5 py-1 rounded-md text-xs font-bold text-slate-400 hover:text-rose-400">O</button>
+          </div>
+        </div>
+
+        <button id="soundToggleBtn" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors">
+          <span id="soundIcon">🔊</span>
+          <span id="soundLabel">Sonido</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Marcador de Puntuaciones -->
+    <section class="w-full grid grid-cols-3 gap-3 text-center">
+      <!-- Jugador 1 / X -->
+      <div id="cardPlayerX" class="bg-slate-900 border-2 border-sky-500/40 rounded-2xl p-3 shadow-lg flex flex-col items-center justify-center transition-all duration-300">
+        <span id="playerXLabel" class="text-xs font-bold text-sky-400 uppercase tracking-wider flex items-center gap-1">
+          <span>Jugador (X)</span>
+        </span>
+        <span id="scoreX" class="text-3xl font-black text-white mt-1">0</span>
+      </div>
+
+      <!-- Empates -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3 shadow-lg flex flex-col items-center justify-center">
+        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Empates</span>
+        <span id="scoreTies" class="text-3xl font-black text-slate-300 mt-1">0</span>
+      </div>
+
+      <!-- Jugador 2 / O (o IA) -->
+      <div id="cardPlayerO" class="bg-slate-900 border-2 border-slate-800 rounded-2xl p-3 shadow-lg flex flex-col items-center justify-center transition-all duration-300">
+        <span id="playerOLabel" class="text-xs font-bold text-rose-400 uppercase tracking-wider flex items-center gap-1">
+          <span>IA (O)</span>
+        </span>
+        <span id="scoreO" class="text-3xl font-black text-white mt-1">0</span>
+      </div>
+    </section>
+
+    <!-- Indicador de Turno y Estado -->
+    <div id="statusBanner" class="w-full text-center py-2 px-4 rounded-xl bg-slate-900 border border-slate-800 text-sm font-semibold text-slate-300 flex items-center justify-center gap-2 min-h-[44px]">
+      <span id="turnIndicatorBadge" class="w-2.5 h-2.5 rounded-full bg-sky-400 animate-pulse"></span>
+      <span id="statusMessage">Turno de las X</span>
+    </div>
+
+    <!-- Tablero 3x3 -->
+    <section class="relative w-full max-w-[360px] aspect-square bg-slate-900/90 border border-slate-800 p-3 rounded-3xl shadow-2xl">
+      <div id="board" class="grid grid-cols-3 grid-rows-3 gap-3 w-full h-full">
+        <!-- 9 Celdas generadas por JS -->
+      </div>
+    </section>
+
+    <!-- Botones de Acción -->
+    <div class="flex items-center gap-3 w-full max-w-[360px]">
+      <button id="resetBoardBtn" class="flex-1 py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-semibold text-sm transition-all duration-150 shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+        <span>Reiniciar Partida</span>
+      </button>
+
+      <button id="resetScoreBtn" title="Reiniciar puntajes" class="p-3 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-400 hover:text-white transition-all border border-slate-700 flex items-center justify-center">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+        </svg>
+      </button>
+    </div>
+
+  </main>
+
+  <!-- Pie de página informativo sobre POO -->
+  <footer class="w-full text-center py-4 text-xs text-slate-500 border-t border-slate-900 mt-6">
+    <p>Arquitectura: <span class="text-slate-400 font-mono">Board</span> • <span class="text-slate-400 font-mono">Player</span> • <span class="text-slate-400 font-mono">AIPlayer (Minimax)</span> • <span class="text-slate-400 font-mono">UIController</span> • <span class="text-slate-400 font-mono">TicTacToeGame</span></p>
+  </footer>
+
+  <!-- ========================================== -->
+  <!-- LÓGICA DEL JUEGO CON PROGRAMACIÓN ORIENTADA A OBJETOS (POO) -->
+  <!-- ========================================== -->
+  <script>
+    /**
+     * CLASE 1: AudioService
+     * Encapsula los efectos de sonido sintetizados mediante la Web Audio API nativa.
+     */
+    class AudioService {
+      constructor() {
+        this.ctx = null;
+        this.enabled = true;
+      }
+
+      initContext() {
+        if (!this.ctx && (window.AudioContext || window.webkitAudioContext)) {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          this.ctx = new AudioContextClass();
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+
+      toggle() {
+        this.enabled = !this.enabled;
+        return this.enabled;
+      }
+
+      playTone(freq, type = 'sine', duration = 0.12, gainValue = 0.15) {
+        if (!this.enabled) return;
+        try {
+          this.initContext();
+          if (!this.ctx) return;
+
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+
+          gain.gain.setValueAtTime(gainValue, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + duration);
+
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+
+          osc.start();
+          osc.stop(this.ctx.currentTime + duration);
+        } catch (e) {
+          // Ignorar restricciones de audio de algunos navegadores
+        }
+      }
+
+      playMove(isX = true) {
+        this.playTone(isX ? 520 : 380, 'triangle', 0.08, 0.2);
+      }
+
+      playWin() {
+        if (!this.enabled) return;
+        const notes = [440, 554, 659, 880];
+        notes.forEach((freq, idx) => {
+          setTimeout(() => this.playTone(freq, 'sine', 0.2, 0.2), idx * 90);
+        });
+      }
+
+      playTie() {
+        if (!this.enabled) return;
+        const notes = [380, 320, 260];
+        notes.forEach((freq, idx) => {
+          setTimeout(() => this.playTone(freq, 'sawtooth', 0.18, 0.1), idx * 110);
+        });
+      }
+
+      playClick() {
+        this.playTone(700, 'sine', 0.04, 0.08);
+      }
+    }
+
+    /**
+     * CLASE 2: ConfettiEffect
+     * Sistema de partículas para celebrar victorias sin librerías externas.
+     */
+    class ConfettiEffect {
+      constructor(canvasId) {
+        this.canvas = document.getElementById(canvasId);
+        this.ctx = this.canvas.getContext('2d');
+        this.particles = [];
+        this.animationId = null;
+        this.resize();
+        window.addEventListener('resize', () => this.resize());
+      }
+
+      resize() {
+        this.canvas.width = window.innerWidth;
+        this.canvas.height = window.innerHeight;
+      }
+
+      trigger(colors = ['#38bdf8', '#818cf8', '#f43f5e', '#fbbf24', '#34d399']) {
+        this.particles = [];
+        const count = 90;
+        for (let i = 0; i < count; i++) {
+          this.particles.push({
+            x: this.canvas.width / 2 + (Math.random() - 0.5) * 200,
+            y: this.canvas.height / 2 + (Math.random() - 0.5) * 100,
+            w: Math.random() * 8 + 4,
+            h: Math.random() * 6 + 4,
+            color: colors[Math.floor(Math.random() * colors.length)],
+            vx: (Math.random() - 0.5) * 12,
+            vy: (Math.random() - 1.2) * 14,
+            rotation: Math.random() * 360,
+            vRot: (Math.random() - 0.5) * 10,
+            gravity: 0.35,
+            opacity: 1
+          });
+        }
+        if (this.animationId) cancelAnimationFrame(this.animationId);
+        this.loop();
+      }
+
+      loop() {
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        let activeParticles = 0;
+
+        for (let p of this.particles) {
+          if (p.opacity <= 0.01) continue;
+          activeParticles++;
+
+          p.x += p.vx;
+          p.vy += p.gravity;
+          p.y += p.vy;
+          p.rotation += p.vRot;
+          p.opacity -= 0.009;
+
+          this.ctx.save();
+          this.ctx.translate(p.x, p.y);
+          this.ctx.rotate((p.rotation * Math.PI) / 180);
+          this.ctx.fillStyle = p.color;
+          this.ctx.globalAlpha = Math.max(0, p.opacity);
+          this.ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+          this.ctx.restore();
+        }
+
+        if (activeParticles > 0) {
+          this.animationId = requestAnimationFrame(() => this.loop());
+        } else {
+          this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+          this.animationId = null;
+        }
+      }
+    }
+
+    /**
+     * CLASE 3: Board (Tablero)
+     * Encapsula el estado del tablero 3x3 y las reglas lógicas del juego.
+     */
+    class Board {
+      constructor() {
+        this.grid = Array(9).fill(null);
+        this.winningCombos = [
+          [0, 1, 2], [3, 4, 5], [6, 7, 8], // Filas
+          [0, 3, 6], [1, 4, 7], [2, 5, 8], // Columnas
+          [0, 4, 8], [2, 4, 6]             // Diagonales
+        ];
+      }
+
+      reset() {
+        this.grid = Array(9).fill(null);
+      }
+
+      isValidMove(index) {
+        return index >= 0 && index < 9 && this.grid[index] === null;
+      }
+
+      makeMove(index, symbol) {
+        if (!this.isValidMove(index)) return false;
+        this.grid[index] = symbol;
+        return true;
+      }
+
+      undoMove(index) {
+        if (index >= 0 && index < 9) {
+          this.grid[index] = null;
+        }
+      }
+
+      getAvailableIndices() {
+        const available = [];
+        for (let i = 0; i < 9; i++) {
+          if (this.grid[i] === null) available.push(i);
+        }
+        return available;
+      }
+
+      isFull() {
+        return this.grid.every(cell => cell !== null);
+      }
+
+      checkWinner() {
+        for (const combo of this.winningCombos) {
+          const [a, b, c] = combo;
+          if (this.grid[a] && this.grid[a] === this.grid[b] && this.grid[a] === this.grid[c]) {
+            return {
+              winner: this.grid[a],
+              combo: combo
+            };
+          }
+        }
+        if (this.isFull()) {
+          return { winner: 'TIE', combo: null };
+        }
+        return null;
+      }
+    }
+
+    /**
+     * CLASE 4: Player (Jugador Base)
+     * Representa a un jugador con nombre, símbolo y puntaje.
+     */
+    class Player {
+      constructor(name, symbol, isAI = false) {
+        this.name = name;
+        this.symbol = symbol;
+        this.isAI = isAI;
+        this.score = 0;
+      }
+
+      incrementScore() {
+        this.score++;
+      }
+
+      resetScore() {
+        this.score = 0;
+      }
+    }
+
+    /**
+     * CLASE 5: AIPlayer (Jugador Inteligente con Herencia)
+     * Hereda de Player e implementa el algoritmo Minimax con evaluación completa.
+     */
+    class AIPlayer extends Player {
+      constructor(name, symbol, difficulty = 'hard') {
+        super(name, symbol, true);
+        this.difficulty = difficulty; // 'easy', 'medium', 'hard'
+      }
+
+      setDifficulty(diff) {
+        this.difficulty = diff;
+      }
+
+      /**
+       * Decide el movimiento según la dificultad seleccionada
+       */
+      decideMove(board, humanSymbol) {
+        const availableMoves = board.getAvailableIndices();
+        if (availableMoves.length === 0) return null;
+
+        if (this.difficulty === 'easy') {
+          // Aleatorio completo
+          return this.getRandomMove(availableMoves);
+        } else if (this.difficulty === 'medium') {
+          // 60% probabilidad de jugada inteligente, 40% aleatoria
+          if (Math.random() < 0.4) {
+            return this.getRandomMove(availableMoves);
+          }
+          return this.getBestMoveMinimax(board, humanSymbol);
+        } else {
+          // Imbatible: Minimax puro
+          return this.getBestMoveMinimax(board, humanSymbol);
+        }
+      }
+
+      getRandomMove(availableMoves) {
+        const randomIndex = Math.floor(Math.random() * availableMoves.length);
+        return availableMoves[randomIndex];
+      }
+
+      /**
+       * Algoritmo Minimax para calcular el movimiento óptimo
+       */
+      getBestMoveMinimax(board, humanSymbol) {
+        let bestScore = -Infinity;
+        let bestMove = null;
+        const availableMoves = board.getAvailableIndices();
+
+        // Optimización inicial: si el centro está libre en el primer turno, tomarlo
+        if (availableMoves.length >= 8 && board.isValidMove(4)) {
+          return 4;
+        }
+
+        for (const index of availableMoves) {
+          board.makeMove(index, this.symbol);
+          const score = this.minimax(board, 0, false, humanSymbol, -Infinity, Infinity);
+          board.undoMove(index);
+
+          if (score > bestScore) {
+            bestScore = score;
+            bestMove = index;
+          }
+        }
+
+        return bestMove !== null ? bestMove : this.getRandomMove(availableMoves);
+      }
+
+      /**
+       * Función recursiva Minimax con poda alfa-beta
+       */
+      minimax(board, depth, isMaximizing, humanSymbol, alpha, beta) {
+        const result = board.checkWinner();
+
+        if (result) {
+          if (result.winner === this.symbol) return 10 - depth;
+          if (result.winner === humanSymbol) return depth - 10;
+          if (result.winner === 'TIE') return 0;
+        }
+
+        const availableMoves = board.getAvailableIndices();
+
+        if (isMaximizing) {
+          let maxEval = -Infinity;
+          for (const index of availableMoves) {
+            board.makeMove(index, this.symbol);
+            const evaluation = this.minimax(board, depth + 1, false, humanSymbol, alpha, beta);
+            board.undoMove(index);
+            maxEval = Math.max(maxEval, evaluation);
+            alpha = Math.max(alpha, evaluation);
+            if (beta <= alpha) break; // Poda Beta
+          }
+          return maxEval;
+        } else {
+          let minEval = Infinity;
+          for (const index of availableMoves) {
+            board.makeMove(index, humanSymbol);
+            const evaluation = this.minimax(board, depth + 1, true, humanSymbol, alpha, beta);
+            board.undoMove(index);
+            minEval = Math.min(minEval, evaluation);
+            beta = Math.min(beta, evaluation);
+            if (beta <= alpha) break; // Poda Alfa
+          }
+          return minEval;
+        }
+      }
+    }
+
+    /**
+     * CLASE 6: UIController
+     * Se encarga de la manipulación del DOM, renderizado del tablero y animaciones.
+     */
+    class UIController {
+      constructor() {
+        this.boardElement = document.getElementById('board');
+        this.statusMessage = document.getElementById('statusMessage');
+        this.turnIndicatorBadge = document.getElementById('turnIndicatorBadge');
+        this.statusBanner = document.getElementById('statusBanner');
+        this.scoreX = document.getElementById('scoreX');
+        this.scoreO = document.getElementById('scoreO');
+        this.scoreTies = document.getElementById('scoreTies');
+        this.playerXLabel = document.getElementById('playerXLabel');
+        this.playerOLabel = document.getElementById('playerOLabel');
+        this.cardPlayerX = document.getElementById('cardPlayerX');
+        this.cardPlayerO = document.getElementById('cardPlayerO');
+        this.difficultyContainer = document.getElementById('difficultyContainer');
+        this.soundIcon = document.getElementById('soundIcon');
+        this.soundLabel = document.getElementById('soundLabel');
+      }
+
+      initBoardGrid(onCellClick) {
+        this.boardElement.innerHTML = '';
+        for (let i = 0; i < 9; i++) {
+          const button = document.createElement('button');
+          button.dataset.index = i;
+          button.className = `
+            relative flex items-center justify-center rounded-2xl bg-slate-800/90 
+            hover:bg-slate-750 border border-slate-700/80 transition-all duration-200 
+            text-4xl sm:text-5xl font-black select-none focus:outline-none 
+            active:scale-95 group overflow-hidden shadow-md
+          `;
+          button.addEventListener('click', () => onCellClick(i));
+          this.boardElement.appendChild(button);
+        }
+      }
+
+      renderCell(index, symbol) {
+        const button = this.boardElement.children[index];
+        if (!button) return;
+
+        if (symbol === 'X') {
+          button.innerHTML = `
+            <svg class="w-10 h-10 sm:w-14 sm:h-14 text-sky-400 stroke-current animate-pop-in drop-shadow-[0_0_12px_rgba(56,189,248,0.5)]" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          `;
+          button.disabled = true;
+        } else if (symbol === 'O') {
+          button.innerHTML = `
+            <svg class="w-10 h-10 sm:w-14 sm:h-14 text-rose-500 stroke-current animate-pop-in drop-shadow-[0_0_12px_rgba(244,63,94,0.5)]" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="8"></circle>
+            </svg>
+          `;
+          button.disabled = true;
+        } else {
+          button.innerHTML = '';
+          button.disabled = false;
+          button.classList.remove('bg-sky-500/20', 'bg-rose-500/20', 'border-sky-400', 'border-rose-400', 'cell-glow-x', 'cell-glow-o');
+        }
+      }
+
+      highlightWinningCombo(combo, symbol) {
+        if (!combo) return;
+        const glowClass = symbol === 'X' ? 'cell-glow-x' : 'cell-glow-o';
+        const bgClass = symbol === 'X' ? 'bg-sky-500/20' : 'bg-rose-500/20';
+        const borderClass = symbol === 'X' ? 'border-sky-400' : 'border-rose-400';
+
+        combo.forEach(idx => {
+          const btn = this.boardElement.children[idx];
+          if (btn) {
+            btn.classList.add(glowClass, bgClass, borderClass, 'scale-105');
+          }
+        });
+      }
+
+      disableAllCells() {
+        for (const btn of this.boardElement.children) {
+          btn.disabled = true;
+        }
+      }
+
+      updateStatus(message, isX = true, isGameOver = false) {
+        this.statusMessage.textContent = message;
+        if (isGameOver) {
+          this.turnIndicatorBadge.className = 'w-2.5 h-2.5 rounded-full bg-amber-400';
+          this.statusBanner.className = 'w-full text-center py-2 px-4 rounded-xl bg-indigo-950/60 border border-indigo-500/30 text-sm font-bold text-white flex items-center justify-center gap-2 min-h-[44px]';
+        } else {
+          const color = isX ? 'bg-sky-400' : 'bg-rose-400';
+          this.turnIndicatorBadge.className = `w-2.5 h-2.5 rounded-full ${color} animate-pulse`;
+          this.statusBanner.className = 'w-full text-center py-2 px-4 rounded-xl bg-slate-900 border border-slate-800 text-sm font-semibold text-slate-300 flex items-center justify-center gap-2 min-h-[44px]';
+        }
+      }
+
+      updateActivePlayerCard(currentSymbol) {
+        if (currentSymbol === 'X') {
+          this.cardPlayerX.classList.add('border-sky-400', 'shadow-sky-500/20');
+          this.cardPlayerX.classList.remove('border-slate-800');
+          this.cardPlayerO.classList.remove('border-rose-400', 'shadow-rose-500/20');
+          this.cardPlayerO.classList.add('border-slate-800');
+        } else {
+          this.cardPlayerO.classList.add('border-rose-400', 'shadow-rose-500/20');
+          this.cardPlayerO.classList.remove('border-slate-800');
+          this.cardPlayerX.classList.remove('border-sky-400', 'shadow-sky-500/20');
+          this.cardPlayerX.classList.add('border-slate-800');
+        }
+      }
+
+      updateScores(scoreX, scoreO, ties) {
+        this.scoreX.textContent = scoreX;
+        this.scoreO.textContent = scoreO;
+        this.scoreTies.textContent = ties;
+      }
+
+      updatePlayerLabels(playerXName, playerOName) {
+        this.playerXLabel.textContent = playerXName;
+        this.playerOLabel.textContent = playerOName;
+      }
+
+      updateSoundButton(enabled) {
+        this.soundIcon.textContent = enabled ? '🔊' : '🔇';
+        this.soundLabel.textContent = enabled ? 'Sonido' : 'Silencio';
+      }
+
+      setAIModeUI(isAI) {
+        if (isAI) {
+          this.difficultyContainer.classList.remove('opacity-40', 'pointer-events-none');
+        } else {
+          this.difficultyContainer.classList.add('opacity-40', 'pointer-events-none');
+        }
+      }
+    }
+
+    /**
+     * CLASE 7: TicTacToeGame (Controlador Principal)
+     * Orquesta el flujo del juego, administra instancias de clases y estados.
+     */
+    class TicTacToeGame {
+      constructor() {
+        this.board = new Board();
+        this.ui = new UIController();
+        this.audio = new AudioService();
+        this.confetti = new ConfettiEffect('confettiCanvas');
+
+        // Estado del juego
+        this.mode = 'ai'; // 'ai' o 'pvp'
+        this.humanSymbol = 'X';
+        this.aiSymbol = 'O';
+        this.difficulty = 'hard';
+        this.tiesCount = 0;
+        this.isGameOver = false;
+        this.isThinkingAI = false;
+
+        // Instancias de Jugadores
+        this.playerX = new Player('Jugador (X)', 'X');
+        this.playerO = new AIPlayer('IA (O)', 'O', this.difficulty);
+        this.currentPlayer = this.playerX;
+
+        // Inicializar componentes y eventos
+        this.initEventListeners();
+        this.ui.initBoardGrid((index) => this.handleCellClick(index));
+        this.updateGameSettings();
+        this.resetGame();
+      }
+
+      initEventListeners() {
+        // Selector de Modo
+        const modeAiBtn = document.getElementById('modeAiBtn');
+        const modePvpBtn = document.getElementById('modePvpBtn');
+
+        modeAiBtn.addEventListener('click', () => {
+          if (this.mode === 'ai') return;
+          this.audio.playClick();
+          this.mode = 'ai';
+          modeAiBtn.className = 'py-2 px-3 rounded-lg text-xs font-medium transition-all duration-200 bg-indigo-600 text-white shadow-sm flex items-center justify-center gap-1.5';
+          modePvpBtn.className = 'py-2 px-3 rounded-lg text-xs font-medium transition-all duration-200 text-slate-400 hover:text-white flex items-center justify-center gap-1.5';
+          this.ui.setAIModeUI(true);
+          this.updateGameSettings();
+          this.resetGame();
+        });
+
+        modePvpBtn.addEventListener('click', () => {
+          if (this.mode === 'pvp') return;
+          this.audio.playClick();
+          this.mode = 'pvp';
+          modePvpBtn.className = 'py-2 px-3 rounded-lg text-xs font-medium transition-all duration-200 bg-indigo-600 text-white shadow-sm flex items-center justify-center gap-1.5';
+          modeAiBtn.className = 'py-2 px-3 rounded-lg text-xs font-medium transition-all duration-200 text-slate-400 hover:text-white flex items-center justify-center gap-1.5';
+          this.ui.setAIModeUI(false);
+          this.updateGameSettings();
+          this.resetGame();
+        });
+
+        // Selector de Dificultad
+        const diffButtons = document.querySelectorAll('.diff-btn');
+        diffButtons.forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            this.audio.playClick();
+            diffButtons.forEach(b => {
+              b.className = 'diff-btn py-2 px-2 rounded-lg text-xs font-medium transition-all text-slate-400 hover:text-white';
+            });
+            e.currentTarget.className = 'diff-btn py-2 px-2 rounded-lg text-xs font-medium transition-all bg-indigo-600 text-white shadow-sm';
+            this.difficulty = e.currentTarget.dataset.difficulty;
+            if (this.playerO instanceof AIPlayer) {
+              this.playerO.setDifficulty(this.difficulty);
+            }
+          });
+        });
+
+        // Selector de Ficha (X / O)
+        const chooseXBtn = document.getElementById('chooseXBtn');
+        const chooseOBtn = document.getElementById('chooseOBtn');
+
+        chooseXBtn.addEventListener('click', () => {
+          if (this.humanSymbol === 'X') return;
+          this.audio.playClick();
+          this.humanSymbol = 'X';
+          this.aiSymbol = 'O';
+          chooseXBtn.className = 'px-2.5 py-1 rounded-md text-xs font-bold text-sky-400 bg-slate-800';
+          chooseOBtn.className = 'px-2.5 py-1 rounded-md text-xs font-bold text-slate-400 hover:text-rose-400';
+          this.updateGameSettings();
+          this.resetGame();
+        });
+
+        chooseOBtn.addEventListener('click', () => {
+          if (this.humanSymbol === 'O') return;
+          this.audio.playClick();
+          this.humanSymbol = 'O';
+          this.aiSymbol = 'X';
+          chooseOBtn.className = 'px-2.5 py-1 rounded-md text-xs font-bold text-rose-400 bg-slate-800';
+          chooseXBtn.className = 'px-2.5 py-1 rounded-md text-xs font-bold text-slate-400 hover:text-sky-400';
+          this.updateGameSettings();
+          this.resetGame();
+        });
+
+        // Botón de Sonido
+        document.getElementById('soundToggleBtn').addEventListener('click', () => {
+          const enabled = this.audio.toggle();
+          this.ui.updateSoundButton(enabled);
+        });
+
+        // Botón Reiniciar Tablero
+        document.getElementById('resetBoardBtn').addEventListener('click', () => {
+          this.audio.playClick();
+          this.resetGame();
+        });
+
+        // Botón Reiniciar Puntuaciones
+        document.getElementById('resetScoreBtn').addEventListener('click', () => {
+          this.audio.playClick();
+          this.playerX.resetScore();
+          this.playerO.resetScore();
+          this.tiesCount = 0;
+          this.ui.updateScores(0, 0, 0);
+          this.resetGame();
+        });
+      }
+
+      updateGameSettings() {
+        if (this.mode === 'ai') {
+          if (this.humanSymbol === 'X') {
+            this.playerX = new Player('Tú (X)', 'X');
+            this.playerO = new AIPlayer('IA (O)', 'O', this.difficulty);
+          } else {
+            this.playerX = new AIPlayer('IA (X)', 'X', this.difficulty);
+            this.playerO = new Player('Tú (O)', 'O');
+          }
+        } else {
+          this.playerX = new Player('Jugador 1 (X)', 'X');
+          this.playerO = new Player('Jugador 2 (O)', 'O');
+        }
+
+        this.ui.updatePlayerLabels(this.playerX.name, this.playerO.name);
+        this.ui.updateScores(this.playerX.score, this.playerO.score, this.tiesCount);
+      }
+
+      resetGame() {
+        this.board.reset();
+        this.isGameOver = false;
+        this.isThinkingAI = false;
+        this.currentPlayer = this.playerX;
+
+        // Limpiar interfaz de celdas
+        for (let i = 0; i < 9; i++) {
+          this.ui.renderCell(i, null);
+        }
+
+        this.ui.updateStatus(`Turno de ${this.currentPlayer.name}`, this.currentPlayer.symbol === 'X', false);
+        this.ui.updateActivePlayerCard(this.currentPlayer.symbol);
+
+        // Si la IA juega como X, debe realizar el primer movimiento
+        if (this.mode === 'ai' && this.currentPlayer.isAI) {
+          this.triggerAIMove();
+        }
+      }
+
+      handleCellClick(index) {
+        if (this.isGameOver || this.isThinkingAI) return;
+        if (!this.board.isValidMove(index)) return;
+
+        this.executeMove(index);
+      }
+
+      executeMove(index) {
+        const symbol = this.currentPlayer.symbol;
+        this.board.makeMove(index, symbol);
+        this.ui.renderCell(index, symbol);
+        this.audio.playMove(symbol === 'X');
+
+        const outcome = this.board.checkWinner();
+
+        if (outcome) {
+          this.handleGameOver(outcome);
+        } else {
+          this.switchTurn();
+        }
+      }
+
+      switchTurn() {
+        this.currentPlayer = this.currentPlayer === this.playerX ? this.playerO : this.playerX;
+        this.ui.updateStatus(`Turno de ${this.currentPlayer.name}`, this.currentPlayer.symbol === 'X', false);
+        this.ui.updateActivePlayerCard(this.currentPlayer.symbol);
+
+        if (this.mode === 'ai' && this.currentPlayer.isAI && !this.isGameOver) {
+          this.triggerAIMove();
+        }
+      }
+
+      triggerAIMove() {
+        this.isThinkingAI = true;
+        this.ui.updateStatus('IA pensando...', this.currentPlayer.symbol === 'X', false);
+
+        // Retardo sutil y natural (350ms) para una experiencia realista
+        setTimeout(() => {
+          if (this.isGameOver) return;
+          const aiPlayer = this.currentPlayer;
+          const opponentSymbol = aiPlayer.symbol === 'X' ? 'O' : 'X';
+          const bestIndex = aiPlayer.decideMove(this.board, opponentSymbol);
+
+          this.isThinkingAI = false;
+          if (bestIndex !== null) {
+            this.executeMove(bestIndex);
+          }
+        }, 350);
+      }
+
+      handleGameOver(outcome) {
+        this.isGameOver = true;
+        this.ui.disableAllCells();
+
+        if (outcome.winner === 'TIE') {
+          this.tiesCount++;
+          this.ui.updateScores(this.playerX.score, this.playerO.score, this.tiesCount);
+          this.ui.updateStatus('¡Partida empatada!', false, true);
+          this.audio.playTie();
+        } else {
+          const winnerPlayer = outcome.winner === this.playerX.symbol ? this.playerX : this.playerO;
+          winnerPlayer.incrementScore();
+          this.ui.updateScores(this.playerX.score, this.playerO.score, this.tiesCount);
+          this.ui.highlightWinningCombo(outcome.combo, outcome.winner);
+          this.ui.updateStatus(`¡Ganador: ${winnerPlayer.name}! 🎉`, outcome.winner === 'X', true);
+          this.audio.playWin();
+
+          // Si el jugador humano ganó o si es 1v1, festejar con confeti
+          if (!winnerPlayer.isAI || this.mode === 'pvp') {
+            this.confetti.trigger();
+          }
+        }
+      }
+    }
+
+    // Inicializar el juego cuando el DOM esté cargado
+    document.addEventListener('DOMContentLoaded', () => {
+      new TicTacToeGame();
+    });
+  </script>
+</body>
+</html>
