@@ -1,4 +1,3 @@
-
 /**
  * Clase que representa una aplicación de lista de tareas (To-Do list).
  * Permite almacenar una lista de tareas, mostrarlas, agregarlas, 

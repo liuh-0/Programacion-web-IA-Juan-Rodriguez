@@ -27,3 +27,13 @@ let miAuto: Auto = {
   nombre: "Toyota",
   anio: 2020
 };
+
+
+/*
+  Crea una pagina HTML con un formulario que tenga los siguientes campos:
+  - correo
+  - contraseña
+
+  Con typescript toma los valores de los inputs, guardalos en un objeto llamado usuario 
+  y luego imprime el objeto en consola.
+*/
